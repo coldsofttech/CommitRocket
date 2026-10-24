@@ -3,11 +3,13 @@ import logging
 import sys
 
 from rich.console import Console
+from rich.markup import escape
 
 from commitrocket import __version__
 from commitrocket.batching import BATCH_TYPES, DETERMINISTIC
 from commitrocket.config import ConfigError, apply_config, find_config
 from commitrocket.doctor import run_doctor
+from commitrocket.errors import CommitRocketError
 from commitrocket.lfs import LFS_THRESHOLD_MIB
 from commitrocket.logs import (
     DEFAULT_LEVEL,
@@ -20,6 +22,7 @@ from commitrocket.notify import is_valid_webhook, send_notifications
 from commitrocket.options import RunOptions
 from commitrocket.report import RunReport
 from commitrocket.runner import run
+from commitrocket.security import validate_ref_part
 from commitrocket.template import DEFAULT_TEMPLATE, PLACEHOLDERS, validate_template
 
 DEFAULT_LIMIT_MIB = 100
@@ -260,6 +263,12 @@ def validate(parser, args):
     if args.lfs_commit_rules and not args.use_lfs:
         parser.error("--lfs-commit-rules requires --use-lfs")
 
+    for label, value in (("--remote", args.remote), ("--branch", args.branch)):
+        if value is not None:
+            try:
+                validate_ref_part(value, label)
+            except CommitRocketError as exc:
+                parser.error(str(exc))
     if args.notify_webhook and not is_valid_webhook(args.notify_webhook):
         parser.error("--notify-webhook must be an http:// or https:// URL")
 
@@ -284,10 +293,14 @@ def run_main(argv):
     known, _ = pre.parse_known_args(argv)
 
     config_path = None
+    ignored_settings = []
     try:
         config_path, values = find_config(known.repo, known.config)
         if values:
-            apply_config(parser, values, config_path)
+            # Only a file named with --config is trusted with sensitive settings.
+            ignored_settings = apply_config(
+                parser, values, config_path, trusted=bool(known.config)
+            )
     except ConfigError as exc:
         parser.error(str(exc))
 
@@ -330,7 +343,20 @@ def run_main(argv):
             "[yellow]Could not open a log file; continuing without one.[/yellow]"
         )
     if config_path:
-        console.print(f"[dim]Using config: {config_path}[/dim]")
+        console.print(f"[dim]Using config: {escape(str(config_path))}[/dim]")
+    if ignored_settings:
+        names = ", ".join(ignored_settings)
+        console.print(
+            f"[yellow]Ignored from {escape(str(config_path))}: {escape(names)}. "
+            "Settings that skip the prompt, change where files are pushed or "
+            "written, or contact other servers are only used from a file you "
+            "pass with --config.[/yellow]"
+        )
+        logging.getLogger(__name__).warning(
+            "Ignored sensitive settings from untrusted config %s: %s",
+            config_path,
+            names,
+        )
 
     report = RunReport(options)
     try:

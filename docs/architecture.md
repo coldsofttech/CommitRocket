@@ -113,6 +113,33 @@ PowerShell's own AppUserModelID, which Windows already trusts), `osascript` on m
 restricted to http(s) URLs with a 10 s timeout. Delivery errors are logged and printed,
 never raised.
 
+## Security hardening
+
+Findings from the security review and what addresses them (`security.py` holds the helpers):
+
+- **Literal file names**: `run_git` sets `GIT_LITERAL_PATHSPECS=1`, so a name such as
+  `[ab].txt` stages only that file instead of also matching `a.txt` and `b.txt`.
+- **No option injection**: `--remote` / `--branch` (and values from config or the
+  upstream) are rejected if empty, starting with `-`, or containing spaces or control
+  characters (`validate_ref_part`, checked in `cli.validate` and `git.resolve_target`),
+  and `--` precedes the remote in `push`, `ls-remote` and `remote get-url`.
+- **Untrusted repository config**: `config.apply_config` ignores `SENSITIVE_KEYS`
+  (`force`, `remote`, `branch`, `report`, `log_file`, `notify_webhook`, `include_from`,
+  `exclude_from`) unless the file was passed with `--config`. The ignored names are
+  printed and logged.
+- **Credentials**: `redact()` hides `user:password@` in URLs. It is applied by the log
+  formatter (so also to tracebacks), to git and push error messages, to the push output
+  shown on the console, and to the report's `error` field.
+- **Private files**: log and report files are restricted to the owner (`0600`, best effort
+  on Windows).
+- **Rule injection**: `lfs.attribute_line` refuses file names with control characters, so
+  a newline cannot add attribute lines.
+- **Report temp file**: `RunReport.write` uses `tempfile.mkstemp` (random name, created
+  exclusively) in the target folder, then `os.replace`.
+- **Rich markup**: file names, commit text, remote output and error messages are shown as
+  `Text` or passed through `escape()`, so brackets such as `[/x]` neither crash the display
+  nor disappear.
+
 ## Logging
 
 `logs.setup_logging` (called from `cli.main`) attaches one `FileHandler` to the

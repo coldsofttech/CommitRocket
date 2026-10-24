@@ -1,5 +1,6 @@
 import time
 
+from rich.markup import escape
 from rich.panel import Panel
 from rich.progress import (
     BarColumn,
@@ -48,9 +49,9 @@ def print_run_info(console, repo, branch, upstream, limit_mib, max_mib, number):
     info = Table.grid(padding=(0, 2))
     info.add_column(style="bold cyan")
     info.add_column()
-    info.add_row("Repository", str(repo))
-    info.add_row("Branch", branch)
-    info.add_row("Push target", upstream)
+    info.add_row("Repository", Text(str(repo)))
+    info.add_row("Branch", Text(branch))
+    info.add_row("Push target", Text(upstream))
     info.add_row("Normal batch limit", f"{limit_mib} MiB")
     info.add_row("Maximum file size", f"{max_mib} MiB")
     info.add_row("Starting commit #", str(number))
@@ -64,7 +65,7 @@ def print_lfs_required(console, repo, paths, threshold_mib):
     table.add_column("Size (MiB)", justify="right")
 
     for path in sorted(paths):
-        table.add_row(path, f"{get_file_size(repo, path) / MIB:.2f}")
+        table.add_row(Text(path), f"{get_file_size(repo, path) / MIB:.2f}")
 
     console.print(table)
     console.print(
@@ -88,7 +89,8 @@ def print_resume(console, staged, entry, unpushed):
         if len(unpushed) > 10:
             lines.append(f"  ... and {len(unpushed) - 10} more")
 
-    console.print(Panel("\n".join(lines), title="Resuming", border_style="yellow"))
+    panel = Panel(Text("\n".join(lines)), title="Resuming", border_style="yellow")
+    console.print(panel)
 
 
 def print_dry_run(
@@ -107,7 +109,7 @@ def print_dry_run(
         lfs_count = len(set(paths) & set(lfs_files))
         table.add_row(
             str(index + 1),
-            messages[index],
+            Text(messages[index]),
             str(len(paths)),
             f"{size / MIB:.2f}",
             str(lfs_count) if lfs_count else "-",
@@ -128,7 +130,7 @@ def print_dry_run(
         details.add_column("File", overflow="fold")
         details.add_column("Size (MiB)", justify="right")
         for path, size in sorted(deferred):
-            details.add_row(path, f"{size / MIB:.2f}")
+            details.add_row(Text(path), f"{size / MIB:.2f}")
         console.print(details)
 
     if no_push:
@@ -146,19 +148,19 @@ def print_stuck_commits(console, commits, blobs, upstream, threshold_mib):
     table.add_column("Size (MiB)", justify="right")
 
     for path, size in blobs:
-        table.add_row(path, f"{size / MIB:.2f}")
+        table.add_row(Text(path), f"{size / MIB:.2f}")
 
     console.print(table)
     console.print(f"\n[bold]{len(commits)} unpushed local commit(s):[/bold]")
     for commit in commits:
-        console.print(f"  {commit}")
+        console.print(Text(f"  {commit}"))
 
     console.print(
         f"\n[bold red]These commits already contain files over {threshold_mib} "
         "MiB, so pushing them would be rejected.[/bold red]\n"
         "[yellow]Nothing was changed. To drop those commits and keep your files "
         "as untracked changes, run:[/yellow]\n\n"
-        f"  git reset --mixed {upstream}\n\n"
+        f"  git reset --mixed {escape(upstream)}\n\n"
         "[yellow]then run CommitRocket again (the commits stay recoverable via "
         "'git reflog').[/yellow]"
     )
@@ -200,7 +202,7 @@ def print_final_summary(
 
     for path, size in sorted(deferred):
         details.add_row(
-            path,
+            Text(path),
             f"{size / MIB:.2f}",
             f"Exceeds --max-mib ({max_mib} MiB)",
         )

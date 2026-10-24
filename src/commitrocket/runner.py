@@ -2,7 +2,9 @@ import logging
 import time
 from pathlib import Path
 
+from rich.markup import escape
 from rich.panel import Panel
+from rich.text import Text
 
 from commitrocket.batching import (
     MIB,
@@ -15,6 +17,7 @@ from commitrocket.eta import EtaEstimator
 from commitrocket.filters import FileFilter
 from commitrocket.git import (
     LocalConfig,
+    add_files,
     find_large_unpushed_blobs,
     get_file_size,
     get_pending_files,
@@ -44,6 +47,7 @@ from commitrocket.report import (
     SUCCESS,
     RunReport,
 )
+from commitrocket.security import redact
 from commitrocket.template import render_message
 from commitrocket.ui import (
     make_progress,
@@ -71,11 +75,10 @@ def own_output_files(repo, options):
         if not raw:
             continue
         path = Path(raw).expanduser().resolve()
-        for candidate in (path, path.with_name(path.name + ".tmp")):
-            try:
-                found.add(candidate.relative_to(repo).as_posix())
-            except ValueError:
-                pass  # outside the repository
+        try:
+            found.add(path.relative_to(repo).as_posix())
+        except ValueError:
+            pass  # outside the repository
     return found
 
 
@@ -186,7 +189,7 @@ def process_batches(
         if journal:
             journal.write(selected, commit_message, commit_number)
 
-        run_git(repo, "add", "--", *selected)
+        add_files(repo, selected)
 
         if not get_staged_files(repo):
             raise CommitRocketError("No staged changes to commit.")
@@ -356,7 +359,9 @@ def run(console, options, report=None):
         )
 
         status = run_git(repo, "status", "--short").stdout.strip()
-        console.print(Panel(status or "(no pending changes)", title="Pending Changes"))
+        console.print(
+            Panel(Text(status or "(no pending changes)"), title="Pending Changes")
+        )
 
         if resume_staged or unpushed:
             logger.info(
@@ -662,9 +667,10 @@ def run(console, options, report=None):
         logger.warning("Interrupted by user")
         return 130
     except (RuntimeError, OSError) as exc:
-        console.print(f"\n[bold red]Error:[/bold red] {exc}")
+        message = redact(str(exc))
+        console.print(f"\n[bold red]Error:[/bold red] {escape(message)}")
         report.status = ABORTED if not acting else FAILED
-        report.error = str(exc)
+        report.error = message
         if acting:
             console.print(
                 "[dim]Run the same command again to resume from where it "

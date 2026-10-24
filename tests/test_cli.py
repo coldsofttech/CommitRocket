@@ -12,16 +12,10 @@ def test_own_output_files_are_found_only_inside_the_repo(tmp_path):
         log_file=str(repo / "logs" / "run.log"),
         report=str(tmp_path / "elsewhere" / "report.json"),
     )
-    assert own_output_files(repo.resolve(), options) == {
-        "logs/run.log",
-        "logs/run.log.tmp",
-    }
+    assert own_output_files(repo.resolve(), options) == {"logs/run.log"}
 
     options = RunOptions(report=str(repo / "report.json"))
-    assert own_output_files(repo.resolve(), options) == {
-        "report.json",
-        "report.json.tmp",
-    }
+    assert own_output_files(repo.resolve(), options) == {"report.json"}
     assert own_output_files(repo.resolve(), RunOptions()) == set()
 
 
@@ -33,6 +27,8 @@ def test_own_output_files_are_found_only_inside_the_repo(tmp_path):
         ["--message", "m", "--message-template", "{nope}"],
         ["--message", "m", "--lfs-threshold-mib", "150"],
         ["--message", "m", "--retries", "-1"],
+        ["--message", "m", "--remote", "--receive-pack=x"],
+        ["--message", "m", "--remote", "origin", "--branch", "-d"],
         [],
     ],
 )

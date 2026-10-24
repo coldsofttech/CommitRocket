@@ -4,9 +4,18 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from commitrocket.security import redact, restrict_permissions
+
 LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
 DEFAULT_LEVEL = "INFO"
 LOGGER_NAME = "commitrocket"
+
+
+class RedactingFormatter(logging.Formatter):
+    """Hides credentials embedded in URLs, including in tracebacks."""
+
+    def format(self, record):
+        return redact(super().format(record))
 
 
 def default_log_dir():
@@ -43,8 +52,9 @@ def setup_logging(level=DEFAULT_LEVEL, log_file=None):
         logger.addHandler(logging.NullHandler())
         return None
 
+    restrict_permissions(path)
     handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+        RedactingFormatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
     )
     logger.addHandler(handler)
     return path.resolve()

@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from rich.table import Table
+from rich.text import Text
 
 from commitrocket.batching import MIB
 from commitrocket.config import ConfigError, find_config
@@ -21,6 +22,7 @@ from commitrocket.git import (
 from commitrocket.journal import Journal
 from commitrocket.lfs import HOST_LIMIT_MIB, is_lfs_available
 from commitrocket.logs import default_log_dir
+from commitrocket.security import redact
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +33,7 @@ NETWORK_TIMEOUT = 60
 
 def _first_line(text):
     lines = [line for line in text.strip().splitlines() if line.strip()]
-    return lines[0] if lines else "no details"
+    return redact(lines[0]) if lines else "no details"
 
 
 def _remote_check(repo, args, label):
@@ -120,12 +122,12 @@ def collect_checks(repo, remote=None, branch=None, offline=False, config_path=No
         add(SKIP, "Push permission", "skipped (--offline)")
     else:
         status, detail = _remote_check(
-            root, ["ls-remote", target.remote, "HEAD"], "remote reachable"
+            root, ["ls-remote", "--", target.remote, "HEAD"], "remote reachable"
         )
         add(status, "Remote access", detail)
         status, detail = _remote_check(
             root,
-            ["push", "--dry-run", target.remote, target.refspec],
+            ["push", "--dry-run", "--", target.remote, target.refspec],
             "push accepted (dry run)",
         )
         add(WARN if status == FAIL else status, "Push permission", detail)
@@ -184,7 +186,8 @@ def run_doctor(
     table.add_column("Check")
     table.add_column("Details", overflow="fold")
     for status, name, detail in results:
-        table.add_row(f"[{STYLES[status]}]{status.upper()}[/]", name, detail)
+        label = f"[{STYLES[status]}]{status.upper()}[/]"
+        table.add_row(label, Text(name), Text(detail))
     console.print(table)
 
     failed = [name for status, name, _ in results if status == FAIL]

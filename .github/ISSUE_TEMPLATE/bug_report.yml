@@ -1,0 +1,65 @@
+name: Bug report
+description: Something did not work as expected
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please check the [README](https://github.com/coldsofttech/CommitRocket#readme)
+        and existing issues first. Do not include secrets, tokens or private file names.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command you ran
+      description: The full `commitrocket` command, including options.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output or error
+      description: Paste the terminal output. The log file path is printed at the end of every run.
+      render: text
+  - type: textarea
+    id: log
+    attributes:
+      label: Relevant log lines
+      description: Re-run with `--level DEBUG` and paste the relevant part of the log file, with any private paths removed.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: CommitRocket version
+      description: Output of `commitrocket --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: tooling
+    attributes:
+      label: Python, Git and git-lfs versions
+      description: For example `Python 3.12, git 2.47, git-lfs 3.6`. `commitrocket doctor` shows these.
+  - type: input
+    id: host
+    attributes:
+      label: Git host
+      description: For example GitHub, GitLab, Bitbucket, self-hosted.

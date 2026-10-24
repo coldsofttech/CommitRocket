@@ -9,6 +9,20 @@ PYPROJECT_NAME = "pyproject.toml"
 # Options that make no sense in a config file.
 NOT_CONFIGURABLE = {"config", "repo", "help", "version"}
 
+# Options an untrusted (repository) config file must not set: they can skip the
+# confirmation, push to another remote, write files, send data to a URL or read
+# files. They work in a file passed explicitly with --config.
+SENSITIVE_KEYS = {
+    "force",
+    "remote",
+    "branch",
+    "report",
+    "log_file",
+    "notify_webhook",
+    "include_from",
+    "exclude_from",
+}
+
 
 class ConfigError(CommitRocketError):
     """The config file could not be read or holds an invalid value."""
@@ -52,19 +66,31 @@ def _load(path):
     return data
 
 
-def apply_config(parser, values, source):
-    """Use config values as the parser's defaults, so the command line wins."""
+def apply_config(parser, values, source, trusted=False):
+    """Use config values as the parser's defaults, so the command line wins.
+
+    A config file found in the repository is untrusted: anyone who can change the
+    repository can change it. Unless trusted (the user named it with --config),
+    settings that can skip the confirmation, push elsewhere, write files or contact
+    other servers are ignored. Returns the names of the ignored settings.
+    """
     actions = {action.dest: action for action in parser._actions}
     defaults = {}
+    ignored = []
 
     for key, value in values.items():
         dest = key.replace("-", "_")
         action = actions.get(dest)
         if action is None or dest in NOT_CONFIGURABLE:
             raise ConfigError(f"{source}: unknown option '{key}'")
-        defaults[dest] = _coerce(action, key, value, source)
+        coerced = _coerce(action, key, value, source)
+        if dest in SENSITIVE_KEYS and not trusted:
+            ignored.append(key)
+        else:
+            defaults[dest] = coerced
 
     parser.set_defaults(**defaults)
+    return ignored
 
 
 def _coerce(action, key, value, source):
