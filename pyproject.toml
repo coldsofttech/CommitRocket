@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "commitrocket"
+version = "0.1.0"
+description = "Batch Git changes by size, commit each batch, and push with live progress."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = ["rich>=13", "pathspec>=0.12"]
+
+[project.scripts]
+commitrocket = "commitrocket.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-xdist>=3", "ruff>=0.6", "pre-commit>=3"]
+
+[tool.uv]
+package = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/commitrocket"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "--strict-markers"
+markers = [
+    "integration: end-to-end runs against a local bare repository (slower; excluded from pre-commit, run in CI)",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
