@@ -4,7 +4,10 @@ import re
 import subprocess
 import time
 
+from rich.markup import escape
+
 from commitrocket.errors import PushError
+from commitrocket.security import redact
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +134,7 @@ def push_with_progress(
 
     process = subprocess.Popen(
         ["git", "-C", str(repo), "push", "--progress"]
-        + ([remote, refspec] if remote else []),
+        + (["--", remote, refspec] if remote else []),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         bufsize=0,
@@ -223,7 +226,7 @@ def push_with_progress(
         progress.update(push_task, description="Git push failed", visible=True)
         raise PushError(
             "git push failed with exit code "
-            f"{return_code}:\n" + "\n".join(messages[-15:]),
+            f"{return_code}:\n" + redact("\n".join(messages[-15:])),
             retryable=is_retryable("\n".join(messages)),
         )
 
@@ -238,6 +241,6 @@ def push_with_progress(
     # Display non-progress messages such as the remote branch update.
     for line in messages:
         if not PERCENT_RE.search(line):
-            console.print(f"[dim]{line}[/dim]")
+            console.print(f"[dim]{escape(redact(line))}[/dim]")
 
     progress.update(push_task, visible=False)

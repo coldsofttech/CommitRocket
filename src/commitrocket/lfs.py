@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 
 from commitrocket.errors import CommitRocketError
 from commitrocket.git import get_file_size, run_git
+from commitrocket.security import has_control_chars
 
 # Git hosts reject pushes containing files larger than this.
 HOST_LIMIT_MIB = 100
@@ -29,6 +30,12 @@ def find_lfs_candidates(repo, files, threshold_bytes, max_bytes):
 
 def attribute_line(path):
     """A .gitattributes-style rule that sends exactly this file through LFS."""
+    if has_control_chars(path):
+        # A newline here would let a file name add rules of its own.
+        raise CommitRocketError(
+            f"Cannot create an LFS rule for {path!r}: the file name contains "
+            "control characters. Rename the file and try again."
+        )
     glob_escaped = re.sub(r"([*?\[\]\\])", r"\\\1", path)
     quoted = glob_escaped.replace("\\", "\\\\").replace('"', '\\"')
     return f'"/{quoted}" filter=lfs diff=lfs merge=lfs -text'

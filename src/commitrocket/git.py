@@ -1,13 +1,17 @@
 import logging
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from commitrocket.errors import CommitRocketError, GitError
+from commitrocket.security import redact, validate_ref_part
 
 logger = logging.getLogger(__name__)
 
 MAX_LOGGED_OUTPUT = 2000
+MAX_LOGGED_COMMAND = 500
+MAX_COMMAND_CHARS = 20000
 
 
 def _logged_output(result):
@@ -23,16 +27,53 @@ def run_git(repo, *args, check=True):
         ["git", "-C", str(repo), *args],
         text=True,
         capture_output=True,
+        # File names are literal: "[ab].txt" must not also match a.txt and b.txt.
+        env={**os.environ, "GIT_LITERAL_PATHSPECS": "1"},
     )
+    command = _shortened(" ".join(args))
     logger.debug(
-        "git %s -> exit %d%s", " ".join(args), result.returncode, _logged_output(result)
+        "git %s -> exit %d%s", command, result.returncode, _logged_output(result)
     )
 
     if check and result.returncode != 0:
         error = result.stderr.strip() or result.stdout.strip()
-        raise GitError(f"git {' '.join(args)} failed:\n{error}")
+        raise GitError(redact(f"git {command} failed:\n{error}"))
 
     return result
+
+
+def _shortened(command):
+    """Keep logs and errors readable when a command lists thousands of files."""
+    if len(command) <= MAX_LOGGED_COMMAND:
+        return command
+    return command[:MAX_LOGGED_COMMAND] + "... [truncated]"
+
+
+def chunk_paths(paths, limit=MAX_COMMAND_CHARS):
+    """Split paths into groups that fit on one command line.
+
+    Windows allows about 32,767 characters for a whole command, so a batch with
+    thousands of files cannot be passed to git in one go. Each path is counted at
+    twice its length, to leave room for the quoting Windows adds.
+    """
+    chunk = []
+    size = 0
+    for path in paths:
+        cost = 2 * len(path) + 3
+        if chunk and size + cost > limit:
+            yield chunk
+            chunk = []
+            size = 0
+        chunk.append(path)
+        size += cost
+    if chunk:
+        yield chunk
+
+
+def add_files(repo, paths):
+    """Stage the given files, however many there are."""
+    for chunk in chunk_paths(paths):
+        run_git(repo, "add", "--", *chunk)
 
 
 def get_paths(repo, *args):
@@ -93,7 +134,8 @@ class PushTarget:
 
     @property
     def label(self):
-        return f"{self.remote}/{self.branch}"
+        """Display name for the target; safe to show, log, report and send."""
+        return redact(f"{self.remote}/{self.branch}")
 
 
 def resolve_target(repo, local_branch, remote=None, branch=None):
@@ -114,6 +156,10 @@ def resolve_target(repo, local_branch, remote=None, branch=None):
 
     branch = branch or configured_merge.removeprefix("refs/heads/") or local_branch
 
+    # These end up on git command lines, so they must not look like options.
+    validate_ref_part(remote, "remote")
+    validate_ref_part(branch, "branch")
+
     tracking_ref = f"refs/remotes/{remote}/{branch}"
     exists = run_git(
         repo, "rev-parse", "--verify", "--quiet", tracking_ref, check=False
@@ -129,12 +175,12 @@ def resolve_target(repo, local_branch, remote=None, branch=None):
 
 
 def get_remote_url(repo, remote):
-    return run_git(repo, "remote", "get-url", remote).stdout.strip()
+    return run_git(repo, "remote", "get-url", "--", remote).stdout.strip()
 
 
 def get_remote_head(repo, remote, ref):
     """Commit the remote currently has for ref, or None if it doesn't exist."""
-    fields = run_git(repo, "ls-remote", remote, ref).stdout.split()
+    fields = run_git(repo, "ls-remote", "--", remote, ref).stdout.split()
     return fields[0] if fields else None
 
 

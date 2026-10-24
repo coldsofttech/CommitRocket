@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-24
+
+### Added
+- Issue and pull request templates, a security policy, a code of conduct and contributing guidelines.
+- Dependabot keeps dependencies, GitHub Actions and pre-commit hooks up to date.
+
+### Fixed
+- Batches with thousands of files no longer fail on Windows with "The filename or extension is too long".
+
+### Security
+- A config file found inside a repository can no longer turn on `force`, set the remote or branch, write reports or logs, or read pattern files; use `--config` for those.
+- File names with characters like `[` or `*` are treated literally, so they no longer pull other files into a batch.
+- `--remote` and `--branch` values that look like Git options are rejected.
+- Credentials inside remote URLs are hidden in logs, errors and reports, and log and report files are readable only by you.
+- File names with line breaks are refused when creating LFS rules.
+- Square brackets in file names and Git messages no longer break or hide output.
+
 ## [0.1.0] - 2026-10-24
 
 ### Added

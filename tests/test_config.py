@@ -73,6 +73,54 @@ def test_bad_config_is_rejected(tmp_path, toml):
         parse(tmp_path, toml)
 
 
+SENSITIVE = (
+    'force = true\nremote = "evil"\nbranch = "evil"\nreport = "/tmp/x"\n'
+    'log-file = "/tmp/y"\nnotify-webhook = "https://evil.example/h"\n'
+    'include-from = ["/etc/passwd"]\nexclude-from = ["/etc/passwd"]\n'
+    "retries = 9\n"
+)
+
+
+def load(tmp_path, toml, trusted):
+    (tmp_path / "commitrocket.toml").write_text(toml)
+    parser = build_parser()
+    path, values = find_config(tmp_path)
+    ignored = apply_config(parser, values, path, trusted=trusted)
+    return parser.parse_args([]), ignored
+
+
+def test_untrusted_config_cannot_set_sensitive_options(tmp_path):
+    args, ignored = load(tmp_path, SENSITIVE, trusted=False)
+
+    assert sorted(ignored) == sorted(
+        [
+            "force",
+            "remote",
+            "branch",
+            "report",
+            "log-file",
+            "notify-webhook",
+            "include-from",
+            "exclude-from",
+        ]
+    )
+    assert args.force is False
+    assert args.remote is None and args.branch is None
+    assert args.report is None and args.log_file is None
+    assert args.notify_webhook is None
+    assert args.include_from is None and args.exclude_from is None
+    assert args.retries == 9  # ordinary settings still apply
+
+
+def test_explicit_config_may_set_sensitive_options(tmp_path):
+    args, ignored = load(tmp_path, SENSITIVE, trusted=True)
+
+    assert ignored == []
+    assert args.force is True
+    assert args.remote == "evil"
+    assert args.notify_webhook == "https://evil.example/h"
+
+
 def test_explicit_config_must_exist(tmp_path):
     with pytest.raises(ConfigError):
         find_config(tmp_path, tmp_path / "missing.toml")

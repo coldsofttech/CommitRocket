@@ -17,6 +17,7 @@ from commitrocket.report import (
     INTERRUPTED,
     SUCCESS,
 )
+from commitrocket.security import redact
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ def build_message(report):
     if report.duration_seconds is not None:
         parts.append(f"in {format_duration(report.duration_seconds)}")
 
-    return title, "; ".join(parts) or "No changes were made."
+    return title, redact("; ".join(parts) or "No changes were made.")
 
 
 def _run_quietly(command, env):
@@ -124,7 +125,7 @@ def notify_webhook(url, title, body, report):
         "status": report.status,
         "exit_code": report.exit_code,
         "repo": report.repo,
-        "target": report.target,
+        "target": redact(report.target) if report.target else None,
         "batches": len(report.batches),
         "files": report.total_files,
         "size_bytes": report.total_bytes,

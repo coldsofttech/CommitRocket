@@ -1,7 +1,57 @@
 # CommitRocket
 
+[![Tests](https://github.com/coldsofttech/CommitRocket/actions/workflows/tests.yml/badge.svg)](https://github.com/coldsofttech/CommitRocket/actions/workflows/tests.yml)
+[![Lint](https://github.com/coldsofttech/CommitRocket/actions/workflows/lint.yml/badge.svg)](https://github.com/coldsofttech/CommitRocket/actions/workflows/lint.yml)
+[![Release](https://img.shields.io/github/v/release/coldsofttech/CommitRocket?logo=github)](https://github.com/coldsofttech/CommitRocket/releases)
+[![PyPI](https://img.shields.io/pypi/v/commitrocket?logo=pypi&logoColor=white)](https://pypi.org/project/commitrocket/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/github/license/coldsofttech/CommitRocket)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
+
 Got a huge pile of changes that a single push would choke on? CommitRocket splits them
 into size-limited batches, commits each batch, and pushes as it goes, with live progress.
+
+## Why CommitRocket?
+
+Pushing a lot of data in one go tends to go wrong. A single commit with gigabytes of videos,
+datasets, archives or generated assets can time out halfway, be rejected for containing a
+file over your host's limit (GitHub refuses anything over 100 MiB), or leave you with nothing
+pushed after hours of waiting. CommitRocket turns that one fragile push into many small ones:
+each batch is committed and uploaded on its own, so progress is saved as you go, a failure
+costs you one batch instead of everything, and you can always see how far along you are.
+
+It is a good fit for:
+
+- **First uploads of big folders**: course material, media libraries, backups, game assets,
+  data dumps, or a repository you are migrating.
+- **Slow or unreliable connections**, where small pushes that can be retried beat one huge one.
+- **Repositories with a few very large files**, which it can store with Git LFS for you
+  without leaving LFS configuration behind.
+- **Unattended runs**: scheduled jobs and CI, with a JSON report and notifications.
+
+## What you get
+
+- **Size-based batching**: choose how big each commit is, how files are picked (in order, or
+  packed tightly), and the largest single file you will accept. Anything too large is skipped
+  and listed at the end instead of failing the run.
+- **Live progress** with elapsed time and an ETA based on how fast your upload really is.
+- **Safe with large files**: files over the 100 MiB host limit are detected before anything
+  is committed. With `--use-lfs` they go through Git LFS, installed and removed again for you.
+- **Recovers from trouble**: failed pushes are retried, every push is checked against the
+  remote, and if a run is interrupted (even with Ctrl+C) you just run the same command to
+  carry on from where it stopped.
+- **Under your control**: preview everything with `--dry-run`, pick files with
+  `.gitignore`-style patterns, choose the remote and branch, commit without pushing, and
+  shape the commit messages with a template.
+- **Easy to automate**: save your options in a config file, read results from a JSON
+  report, get a desktop or webhook notification when a long run ends, and check your setup
+  with `commitrocket doctor`.
+- **Leaves a trail**: every run writes a log file you can attach to a bug report.
+
+It runs on Windows, macOS and Linux and talks to your remote through plain Git, so it works
+with any host you can already push to. It never changes your global Git configuration:
+temporary settings live in the repository and are restored afterwards.
 
 ## Install
 
@@ -105,6 +155,14 @@ message-template = "{message} #{n} ({files} files, {size:.0f} MiB)"
 message = "Videos"
 retries = 5
 ```
+
+**A config file inside a repository is not fully trusted**, because anyone who can change the
+repository can change it. If you run CommitRocket in a repository you cloned, a file found
+there is not allowed to turn on `force`, choose `remote` or `branch`, set `report`,
+`log-file` or `notify-webhook`, or read pattern files (`include-from`, `exclude-from`).
+Those settings are ignored with a warning. To use them, keep them in a file you trust and
+pass it explicitly: `commitrocket --config path/to/commitrocket.toml`. They also work as
+normal command-line options.
 
 ### Commit message templates
 
@@ -393,6 +451,12 @@ of the run and are put back afterwards. Your global Git configuration is never t
 
 If you run CommitRocket without `--use-lfs` and a file is over 100 MiB, it stops before
 committing anything and tells you to use the flag.
+
+### Contributing and security
+
+Bug reports and ideas are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Please report
+security problems privately, as described in [SECURITY.md](SECURITY.md). Everyone taking
+part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ### Interrupted or failed runs
 

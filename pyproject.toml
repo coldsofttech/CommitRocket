@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "commitrocket"
-version = "0.1.0"
+version = "0.1.1"
 description = "Batch Git changes by size, commit each batch, and push with live progress."
 readme = "README.md"
 license = { file = "LICENSE" }

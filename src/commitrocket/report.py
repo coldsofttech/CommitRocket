@@ -1,11 +1,13 @@
 import json
 import os
+import tempfile
 import time
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
 from commitrocket import __version__
+from commitrocket.security import redact_value, restrict_permissions
 
 SCHEMA_VERSION = 1
 
@@ -33,7 +35,8 @@ class RunReport:
         self.branch = None
         self.target = None
         self.log_file = None
-        self.settings = asdict(options) if options else {}
+        # --remote may be a URL with embedded credentials.
+        self.settings = redact_value(asdict(options)) if options else {}
         self.resumed = {"staged_files": 0, "unpushed_commits": 0}
         self.lfs = {"files": 0, "rules_commit": None}
         self.batches = []
@@ -109,10 +112,19 @@ class RunReport:
         """Write the report as JSON, replacing any file there in one step."""
         path = Path(path).expanduser()
         path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_name(path.name + ".tmp")
-        temporary.write_text(
-            json.dumps(self.to_dict(), indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
+        text = json.dumps(self.to_dict(), indent=2, ensure_ascii=False) + "\n"
+
+        # A randomly named file created exclusively (and private to the owner), so
+        # nobody can pre-create a link at a predictable name to redirect the write.
+        descriptor, name = tempfile.mkstemp(
+            dir=path.parent, prefix=path.name + ".", suffix=".tmp"
         )
-        os.replace(temporary, path)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(text)
+            restrict_permissions(name)
+            os.replace(name, path)
+        except BaseException:
+            Path(name).unlink(missing_ok=True)
+            raise
         return path.resolve()
