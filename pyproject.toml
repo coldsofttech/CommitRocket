@@ -4,12 +4,31 @@ build-backend = "hatchling.build"
 
 [project]
 name = "commitrocket"
-version = "0.1.1"
+version = "0.1.2"
 description = "Batch Git changes by size, commit each batch, and push with live progress."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
+keywords = ["git", "commit", "push", "batch", "large-files", "git-lfs", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Utilities",
+]
 dependencies = ["rich>=13", "pathspec>=0.12"]
+
+[project.urls]
+Homepage = "https://github.com/coldsofttech/CommitRocket"
+Issues = "https://github.com/coldsofttech/CommitRocket/issues"
 
 [project.scripts]
 commitrocket = "commitrocket.cli:main"

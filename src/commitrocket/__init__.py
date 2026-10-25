@@ -1,3 +1,3 @@
 """CommitRocket: batch Git changes by size, commit each batch, and push."""
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"

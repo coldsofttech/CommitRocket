@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-25
+
+### Changed
+- `--use-lfs` now commits LFS rules by default so checkouts and clones get the real files. Use `--no-lfs-commit-rules` for the old per-run behaviour.
+- Releases are published to PyPI with trusted publishing instead of an API token.
+- The PyPI page now shows keywords, classifiers and project links.
+
 ## [0.1.1] - 2026-10-24
 
 ### Added
