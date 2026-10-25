@@ -1,0 +1,35 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+html,body{margin:0;padding:0;background:#0D1117}
+svg{display:block}
+</style></head><body>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <rect width="1280" height="640" fill="#0D1117"/>
+  <!-- batch blocks trailing the rocket -->
+  <g fill="none" stroke="#FF7A45" stroke-width="6" stroke-linejoin="round">
+    <rect x="800" y="468" width="64" height="40" rx="8" opacity="0.35"/>
+    <rect x="892" y="438" width="64" height="40" rx="8" opacity="0.55"/>
+    <rect x="984" y="408" width="64" height="40" rx="8" opacity="0.8"/>
+  </g>
+  <!-- rocket, rotated toward upper right -->
+  <g transform="translate(1010 250) rotate(45)" fill="none" stroke="#FF7A45" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M0 -150 C50 -100 60 -30 50 50 L-50 50 C-60 -30 -50 -100 0 -150 Z"/>
+    <circle cx="0" cy="-40" r="22"/>
+    <path d="M-50 10 L-90 70 L-50 50"/>
+    <path d="M50 10 L90 70 L50 50"/>
+    <path d="M-24 80 L0 140 L24 80"/>
+  </g>
+  <!-- text -->
+  <text x="80" y="290" font-size="112" font-weight="700" fill="#FFFFFF">CommitRocket</text>
+  <text x="84" y="360" font-size="40" fill="#C9D1D9">Push huge changes in small batches</text>
+  <!-- chips -->
+  <g font-size="28" font-weight="600" text-anchor="middle">
+    <rect x="84" y="420" width="190" height="52" rx="26" fill="none" stroke="#FF7A45" stroke-width="2"/>
+    <text x="179" y="456" fill="#FF7A45">Python 3.11+</text>
+    <rect x="294" y="420" width="120" height="52" rx="26" fill="none" stroke="#FF7A45" stroke-width="2"/>
+    <text x="354" y="456" fill="#FF7A45">CLI</text>
+    <rect x="434" y="420" width="170" height="52" rx="26" fill="none" stroke="#FF7A45" stroke-width="2"/>
+    <text x="519" y="456" fill="#FF7A45">Git LFS</text>
+  </g>
+</svg>
+</body></html>
