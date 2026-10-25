@@ -23,7 +23,6 @@ def test_own_output_files_are_found_only_inside_the_repo(tmp_path):
     "argv",
     [
         ["--message", "m", "--no-push", "--use-lfs"],
-        ["--message", "m", "--lfs-commit-rules"],
         ["--message", "m", "--message-template", "{nope}"],
         ["--message", "m", "--lfs-threshold-mib", "150"],
         ["--message", "m", "--retries", "-1"],

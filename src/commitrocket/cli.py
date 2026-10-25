@@ -130,10 +130,18 @@ def build_parser():
     )
     parser.add_argument(
         "--lfs-commit-rules",
+        dest="lfs_commit_rules",
         action="store_true",
-        help="With --use-lfs, also commit LFS rules to .gitattributes (one per "
-        "file extension) so clones get real files and future files of the same "
-        "type use LFS",
+        default=True,
+        help="With --use-lfs, commit LFS rules to .gitattributes (one per file "
+        "extension) so clones and checkouts get real files (default)",
+    )
+    parser.add_argument(
+        "--no-lfs-commit-rules",
+        dest="lfs_commit_rules",
+        action="store_false",
+        help="With --use-lfs, keep the LFS rules local to this run. Checkouts "
+        "and clones will then contain LFS pointer files instead of the real files",
     )
     parser.add_argument(
         "--dry-run",
@@ -260,8 +268,6 @@ def validate(parser, args):
             "stay local and a later plain 'git push' would publish LFS pointers "
             "without their data"
         )
-    if args.lfs_commit_rules and not args.use_lfs:
-        parser.error("--lfs-commit-rules requires --use-lfs")
 
     for label, value in (("--remote", args.remote), ("--branch", args.branch)):
         if value is not None:

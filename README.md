@@ -98,7 +98,7 @@ nothing staged, then asks for confirmation.
 | `--log-file` | Write the log to this file instead of the default folder |
 | `--lfs-threshold-mib` | With `--use-lfs`, files larger than this use LFS (default 100, `0` = every file) |
 | `--use-lfs` | Store files over 100 MiB with Git LFS for this run (see below) |
-| `--lfs-commit-rules` | With `--use-lfs`, also commit LFS rules so clones get the real files |
+| `--no-lfs-commit-rules` | With `--use-lfs`, keep LFS rules local to the run (checkouts and clones then show pointer files, not real files) |
 | `--report` | Write a JSON summary of the run to this file |
 | `--notify` | Show a desktop notification when the run ends |
 | `--notify-webhook` | Send a JSON summary to this web address when the run ends |
@@ -285,7 +285,7 @@ commitrocket --repo . --message "Add assets"     # later: pushes the saved commi
 
 **Videos in LFS that clones can download too**
 ```
-commitrocket --repo . --message "Videos" --use-lfs --lfs-commit-rules
+commitrocket --repo . --message "Videos" --use-lfs
 ```
 
 **See what would happen first**
@@ -432,12 +432,13 @@ used up quickly. Git's own settings files (`.gitattributes`, `.gitignore`, `.lfs
 always stay as normal files. The threshold cannot be above 100, since larger files are
 rejected by hosts.
 
-To let clones receive the real files, add `--lfs-commit-rules`. CommitRocket then commits
+So that checkouts and clones receive the real files, CommitRocket commits the LFS rules by default. It commits
 one rule per file type (for example `*.mp4`) to `.gitattributes` as `<message> (LFS rules)`,
 pushes it first, and your files follow as LFS pointers. Because rules are per type, every
 file of that type is stored in LFS from then on, including small ones and future ones.
 Files without an extension get an exact-path rule. `.gitattributes` must have no
-uncommitted changes beforehand.
+uncommitted changes beforehand. Pass `--no-lfs-commit-rules` to skip this; videos then turn into
+text pointer files after a pull, reset or clone.
 
 If a run fails after committing LFS files but before pushing them, the LFS hooks are left
 installed so the files can still be uploaded. Run CommitRocket again to finish; avoid a

@@ -79,7 +79,7 @@ remain, `130` interrupted.
   `refs/remotes/<remote>/<branch>..HEAD`, or `HEAD --not --remotes=<remote>` when that
   branch was never pushed.
 - **`--no-push`**: skips push and verification; rejected together with `--use-lfs`.
-- **`--lfs-commit-rules`**: `LfsSession.write_committed_rules` appends one rule per
+- **`--lfs-commit-rules`** (default on with `--use-lfs`; `--no-lfs-commit-rules` turns it off): `LfsSession.write_committed_rules` appends one rule per
   extension (`committed_rule_lines`; exact path for extension-less or odd names) to
   `.gitattributes` after checking it is clean. The runner commits it as
   `<message> (LFS rules)` and pushes it before the first batch. Local-only rules in

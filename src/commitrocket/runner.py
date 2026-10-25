@@ -433,7 +433,8 @@ def run(console, options, report=None):
                 else:
                     lfs_scope = (
                         f"{which} will be stored with Git LFS for this run only; "
-                        "no LFS config is committed."
+                        "no LFS config is committed, so checkouts and clones will "
+                        "contain LFS pointer files instead of the real files."
                     )
                 if o.dry_run and not is_lfs_available():
                     lfs_scope += " git-lfs is not installed and would be installed."

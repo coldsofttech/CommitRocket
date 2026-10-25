@@ -28,7 +28,7 @@ class RunOptions:
     lfs_threshold_mib: int = LFS_THRESHOLD_MIB
     lfs_threads: int | None = None
     lfs_batch_mib: int | None = None
-    lfs_commit_rules: bool = False
+    lfs_commit_rules: bool = True
     include: list = field(default_factory=list)
     exclude: list = field(default_factory=list)
     include_from: list = field(default_factory=list)
