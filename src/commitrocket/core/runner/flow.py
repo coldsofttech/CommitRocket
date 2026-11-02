@@ -24,6 +24,7 @@ def run(console, options, report=None):
     started_at = time.monotonic()
     lfs = None
     config = None
+    journal = None
     acting = False
     completed = False
 
@@ -86,7 +87,9 @@ def run(console, options, report=None):
             o.retries,
         )
 
-        journal, entry, resume_staged = read_resume_state(repo, o)
+        journal, prior, same_run, entry, resume_staged = read_resume_state(
+            console, repo, o, branch, target.label
+        )
 
         # Earlier failed runs can leave commits that the host will reject.
         stuck = find_large_unpushed_blobs(repo, HOST_LIMIT_MIB * MIB, target.revs)
@@ -108,7 +111,11 @@ def run(console, options, report=None):
             return 2
 
         unpushed = get_unpushed_commits(repo, target.revs)
-        start_number = max(o.number, entry["number"] + 1) if resume_staged else o.number
+        start_number = o.number
+        if same_run:
+            start_number = max(start_number, prior["next_number"])
+        if resume_staged:
+            start_number = max(start_number, entry["number"] + 1)
 
         from rich.panel import Panel
         from rich.text import Text
@@ -243,6 +250,15 @@ def run(console, options, report=None):
 
         acting = True
         try:
+            if same_run:
+                journal.note("resumed", staged_files=len(resume_staged))
+            else:
+                journal.start(
+                    o.params,
+                    branch,
+                    target.label,
+                    run_git(repo, "rev-parse", "HEAD").stdout.strip(),
+                )
             # Repository-local settings only; the previous values are restored below.
             from commitrocket.core.runner.setup import apply_local_config, configure_lfs
             from commitrocket.git.git import LocalConfig
@@ -328,6 +344,8 @@ def run(console, options, report=None):
                 config.restore()
                 logger.info("Local git config restored")
 
+        journal.delete()
+
         from commitrocket.io.ui import print_final_summary
 
         code = print_final_summary(
@@ -361,6 +379,8 @@ def run(console, options, report=None):
         console.print("\n[yellow]Interrupted by user.[/yellow]")
         report.status = INTERRUPTED
         report.error = "Interrupted by user"
+        if acting and journal:
+            journal.note("interrupted")
         if acting:
             console.print(
                 "[dim]Run the same command again to resume from where it stopped.[/dim]"
@@ -377,6 +397,8 @@ def run(console, options, report=None):
         console.print(f"\n[bold red]Error:[/bold red] {escape(message)}")
         report.status = ABORTED if not acting else FAILED
         report.error = message
+        if acting and journal:
+            journal.note("failed", error=message)
         if acting:
             console.print(
                 "[dim]Run the same command again to resume from where it stopped.[/dim]"

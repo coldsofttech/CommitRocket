@@ -5,6 +5,8 @@
 ## [0.1.3] - 2026-11-14
 
 ### Added
+- `--resume` continues an interrupted run using the parameters it started with; different parameters are rejected. Running without `--resume` and with different parameters starts a new run.
+- The run journal is now `.git/commitrocket-journal.jsonl`, an event log of the run's parameters and progress, deleted when the run finishes.
 - Commits now end with a `Prepared and Committed By: 🚀 CommitRocket (...)` attribution line, never added twice.
 - `--no-attribution` (alias `--ignore-attribution`, or `no-attribution = true` in the config file) skips it.
 

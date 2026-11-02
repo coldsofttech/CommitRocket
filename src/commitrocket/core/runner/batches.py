@@ -113,8 +113,9 @@ def process_batches(
             raise CommitRocketError("No staged changes to commit.")
 
         run_git(repo, "commit", "-m", commit_message)
+        commit_sha = run_git(repo, "rev-parse", "HEAD").stdout.strip()
         if journal:
-            journal.clear()
+            journal.committed(commit_number, commit_sha)
 
         entry = None
         if report:
@@ -124,7 +125,7 @@ def process_batches(
                 selected,
                 total_bytes,
                 lfs_files=len(lfs_files.intersection(selected)),
-                commit=run_git(repo, "rev-parse", "HEAD").stdout.strip(),
+                commit=commit_sha,
             )
 
         # Catch files that did not become LFS pointers before uploading them.
@@ -152,6 +153,8 @@ def process_batches(
                 verify()
                 if entry:
                     entry["verified"] = True
+            if journal:
+                journal.pushed(commit_sha)
 
         batch_count += 1
         commit_number += 1

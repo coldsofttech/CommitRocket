@@ -6,6 +6,7 @@ def run_main(argv):
     from rich.markup import escape
 
     from commitrocket.cli.parser import build_parser
+    from commitrocket.cli.resume import apply_resume, run_params
     from commitrocket.cli.validate import validate
     from commitrocket.core.options import RunOptions
     from commitrocket.core.runner import run
@@ -36,7 +37,10 @@ def run_main(argv):
         parser.error(str(exc))
 
     args = parser.parse_args(argv)
+    if args.resume:
+        apply_resume(parser, argv, args, known.repo)
     max_mib = validate(parser, args)
+    params = run_params(parser, args)
 
     options = RunOptions(
         repo=args.repo,
@@ -65,6 +69,8 @@ def run_main(argv):
         retries=args.retries,
         post_buffer_mib=args.post_buffer_mib,
         report=args.report,
+        resume=args.resume,
+        params=params,
     )
 
     console = Console()

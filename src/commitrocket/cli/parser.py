@@ -39,6 +39,13 @@ def build_parser():
         f"Placeholders: {', '.join(PLACEHOLDERS)}",
     )
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Continue the interrupted run recorded in this repository, using the "
+        "parameters it started with. Other run parameters can't be given again "
+        "unless they are identical; run without --resume to start a new run",
+    )
+    parser.add_argument(
         "--no-attribution",
         "--ignore-attribution",
         dest="no_attribution",
