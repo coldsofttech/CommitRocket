@@ -1,6 +1,12 @@
 import pytest
 
-from commitrocket.template import DEFAULT_TEMPLATE, render_message, validate_template
+from commitrocket.template import (
+    ATTRIBUTION,
+    DEFAULT_TEMPLATE,
+    add_attribution,
+    render_message,
+    validate_template,
+)
 
 
 def render(template, **overrides):
@@ -37,3 +43,25 @@ def test_invalid_templates_are_rejected(template):
 def test_valid_and_empty_templates():
     assert validate_template(DEFAULT_TEMPLATE) is None
     assert validate_template("   ") is not None
+
+
+def test_attribution_is_appended_after_a_blank_line():
+    assert add_attribution("Videos #1") == f"Videos #1\n\n{ATTRIBUTION}"
+
+
+def test_attribution_keeps_multiline_bodies_and_trims_trailing_space():
+    assert add_attribution("Title\n\nBody\n\n") == f"Title\n\nBody\n\n{ATTRIBUTION}"
+
+
+def test_attribution_is_never_added_twice():
+    once = add_attribution("Videos #1")
+    assert add_attribution(once) == once
+
+
+def test_attribution_can_be_switched_off():
+    assert add_attribution("Videos #1", enabled=False) == "Videos #1"
+
+
+def test_attribution_names_commitrocket_and_links_to_the_repo():
+    assert ATTRIBUTION.startswith("Prepared and Committed By: 🚀 CommitRocket (")
+    assert "https://github.com/coldsofttech/CommitRocket" in ATTRIBUTION

@@ -2,6 +2,11 @@ from datetime import date
 
 DEFAULT_TEMPLATE = "{message} #{n}"
 
+ATTRIBUTION = (
+    "Prepared and Committed By: 🚀 CommitRocket "
+    "(https://github.com/coldsofttech/CommitRocket)"
+)
+
 PLACEHOLDERS = ("message", "n", "batch", "files", "size", "first", "date")
 
 
@@ -21,6 +26,17 @@ def render_message(template, message, n, batch, files, size_mib, first):
         first=first,
         date=date.today().isoformat(),
     ).strip()
+
+
+def add_attribution(message, enabled=True):
+    """Append the CommitRocket attribution trailer to a commit message.
+
+    The trailer goes after a blank line at the end. It is never added twice and
+    the message is returned untouched when attribution is switched off.
+    """
+    if not enabled or ATTRIBUTION in message.splitlines():
+        return message
+    return f"{message.rstrip()}\n\n{ATTRIBUTION}"
 
 
 def validate_template(template):

@@ -17,6 +17,7 @@ class RunOptions:
     max_mib: int = 300
     batch_type: str = DETERMINISTIC
     message_template: str = DEFAULT_TEMPLATE
+    attribution: bool = True
     remote: str | None = None
     branch: str | None = None
     no_push: bool = False

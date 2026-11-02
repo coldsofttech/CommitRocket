@@ -48,7 +48,7 @@ from commitrocket.report import (
     RunReport,
 )
 from commitrocket.security import redact
-from commitrocket.template import render_message
+from commitrocket.template import add_attribution, render_message
 from commitrocket.ui import (
     make_progress,
     print_dry_run,
@@ -156,15 +156,12 @@ def process_batches(
         progress.update(
             task,
             description=(
-                f"Batch {batch_count + 1}/{estimated_total}: "
-                f"commit #{commit_number}"
+                f"Batch {batch_count + 1}/{estimated_total}: commit #{commit_number}"
             ),
         )
 
         console.rule(f"[bold cyan]Batch {batch_count + 1}[/bold cyan]")
-        console.print(
-            f"Selected: {len(selected)} file(s), {total_bytes / MIB:.2f} MiB"
-        )
+        console.print(f"Selected: {len(selected)} file(s), {total_bytes / MIB:.2f} MiB")
         logger.info(
             "Batch %d/%d: %d file(s), %.2f MiB, commit #%d",
             batch_count + 1,
@@ -175,14 +172,17 @@ def process_batches(
         )
         logger.debug("Batch %d files: %s", batch_count + 1, selected)
 
-        commit_message = render_message(
-            options.message_template,
-            options.message,
-            commit_number,
-            batch_count + 1,
-            len(selected),
-            total_bytes / MIB,
-            selected[0],
+        commit_message = add_attribution(
+            render_message(
+                options.message_template,
+                options.message,
+                commit_number,
+                batch_count + 1,
+                len(selected),
+                total_bytes / MIB,
+                selected[0],
+            ),
+            options.attribution,
         )
 
         # Lets an interrupted run recognise the files it left staged.
@@ -344,9 +344,7 @@ def run(console, options, report=None):
             return 2
 
         unpushed = get_unpushed_commits(repo, target.revs)
-        start_number = (
-            max(o.number, entry["number"] + 1) if resume_staged else o.number
-        )
+        start_number = max(o.number, entry["number"] + 1) if resume_staged else o.number
 
         print_run_info(
             console,
@@ -450,14 +448,17 @@ def run(console, options, report=None):
                 o.batch_type,
             )
             messages = [
-                render_message(
-                    o.message_template,
-                    o.message,
-                    start_number + index,
-                    index + 1,
-                    len(paths),
-                    size / MIB,
-                    paths[0],
+                add_attribution(
+                    render_message(
+                        o.message_template,
+                        o.message,
+                        start_number + index,
+                        index + 1,
+                        len(paths),
+                        size / MIB,
+                        paths[0],
+                    ),
+                    o.attribution,
                 )
                 for index, (paths, size) in enumerate(batches)
             ]
@@ -579,7 +580,9 @@ def run(console, options, report=None):
                 if o.lfs_commit_rules and lfs_paths:
                     if lfs.write_committed_rules(lfs_paths):
                         run_git(repo, "add", "--", ".gitattributes")
-                        rules_message = f"{o.message.rstrip()} (LFS rules)"
+                        rules_message = add_attribution(
+                            f"{o.message.rstrip()} (LFS rules)", o.attribution
+                        )
                         run_git(repo, "commit", "-m", rules_message)
                         logger.info("Committed LFS rules: %s", rules_message)
                         report.lfs["rules_commit"] = run_git(
@@ -662,8 +665,7 @@ def run(console, options, report=None):
         report.error = "Interrupted by user"
         if acting:
             console.print(
-                "[dim]Run the same command again to resume from where it "
-                "stopped.[/dim]"
+                "[dim]Run the same command again to resume from where it stopped.[/dim]"
             )
         logger.warning("Interrupted by user")
         return 130
@@ -674,8 +676,7 @@ def run(console, options, report=None):
         report.error = message
         if acting:
             console.print(
-                "[dim]Run the same command again to resume from where it "
-                "stopped.[/dim]"
+                "[dim]Run the same command again to resume from where it stopped.[/dim]"
             )
         logger.error("Run failed: %s", exc, exc_info=True)
         return 1
