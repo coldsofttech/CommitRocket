@@ -37,3 +37,6 @@ class RunOptions:
     # Files the run itself writes; they are never committed, even inside the repo.
     log_file: str | None = None
     report: str | None = None
+    # --resume, and the parameters of the run as stored in the journal.
+    resume: bool = False
+    params: dict = field(default_factory=dict)

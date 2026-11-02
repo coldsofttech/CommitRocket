@@ -27,7 +27,7 @@ from commitrocket.git import (
     resolve_target,
     run_git,
 )
-from commitrocket.journal import Journal
+from commitrocket.journal import Journal, JournalError
 from commitrocket.lfs import (
     HOST_LIMIT_MIB,
     LfsSession,
@@ -195,8 +195,9 @@ def process_batches(
             raise CommitRocketError("No staged changes to commit.")
 
         run_git(repo, "commit", "-m", commit_message)
+        commit_sha = run_git(repo, "rev-parse", "HEAD").stdout.strip()
         if journal:
-            journal.clear()
+            journal.committed(commit_number, commit_sha)
 
         entry = None
         if report:
@@ -206,7 +207,7 @@ def process_batches(
                 selected,
                 total_bytes,
                 lfs_files=len(lfs_files.intersection(selected)),
-                commit=run_git(repo, "rev-parse", "HEAD").stdout.strip(),
+                commit=commit_sha,
             )
 
         # Catch files that did not become LFS pointers before uploading them.
@@ -234,6 +235,8 @@ def process_batches(
                 verify()
                 if entry:
                     entry["verified"] = True
+            if journal:
+                journal.pushed(commit_sha)
 
         batch_count += 1
         commit_number += 1
@@ -245,6 +248,37 @@ def process_batches(
         logger.info("Batch %d %s", batch_count, outcome)
 
     return batch_count
+
+
+def check_resume(repo, prior, options, branch, target_label):
+    """Make sure --resume can safely continue the journal's run."""
+    if prior is None:
+        raise CommitRocketError(
+            "--resume: no interrupted run found in this repository. "
+            "Run without --resume to start a new run."
+        )
+    if prior["params"] != options.params:
+        raise CommitRocketError(
+            "--resume: the parameters differ from the interrupted run. "
+            "Run without --resume to start a new run."
+        )
+    if prior["branch"] != branch or prior["target"] != target_label:
+        raise CommitRocketError(
+            f"--resume: the interrupted run was on {prior['branch']} -> "
+            f"{prior['target']}, but this is {branch} -> {target_label}. "
+            "Run without --resume to start a new run."
+        )
+    anchor = prior["commits"][-1][1] if prior["commits"] else prior["head"]
+    if anchor:
+        reachable = run_git(
+            repo, "merge-base", "--is-ancestor", anchor, "HEAD", check=False
+        )
+        if reachable.returncode != 0:
+            raise CommitRocketError(
+                "--resume: the repository changed since the interrupted run "
+                f"(commit {anchor[:10]} is no longer in the history of {branch}). "
+                "Run without --resume to start a new run."
+            )
 
 
 def run(console, options, report=None):
@@ -264,6 +298,7 @@ def run(console, options, report=None):
     started_at = time.monotonic()
     lfs = None
     config = None
+    journal = None
     acting = False
     completed = False
 
@@ -310,9 +345,28 @@ def run(console, options, report=None):
             o.retries,
         )
 
-        # Files left staged by an interrupted run are ours; anything else is not.
+        # The journal of an interrupted run holds its parameters. The same
+        # parameters continue that run; different ones start a new run.
         journal = Journal(repo)
-        entry = journal.read()
+        try:
+            prior = journal.state()
+        except JournalError:
+            if o.resume:
+                raise
+            logger.warning("Ignoring an incompatible journal: %s", journal.path)
+            prior = None
+        if o.resume:
+            check_resume(repo, prior, o, branch, target.label)
+        same_run = prior is not None and prior["params"] == o.params
+        if prior is not None and not same_run:
+            console.print(
+                "[yellow]The parameters differ from the interrupted run; "
+                "starting a new run.[/yellow]"
+            )
+            logger.info("Journal parameters differ; starting a new run")
+        entry = journal.read() if same_run else None
+
+        # Files left staged by an interrupted run are ours; anything else is not.
         staged = get_staged_files(repo)
         resume_staged = []
         if staged:
@@ -323,8 +377,6 @@ def run(console, options, report=None):
                     f"{len(staged)} file(s) already staged. Commit or unstage "
                     "them before running this tool."
                 )
-        elif entry and not o.dry_run:
-            journal.clear()
 
         # Earlier failed runs can leave commits that the host will reject.
         stuck = find_large_unpushed_blobs(repo, HOST_LIMIT_MIB * MIB, target.revs)
@@ -344,7 +396,11 @@ def run(console, options, report=None):
             return 2
 
         unpushed = get_unpushed_commits(repo, target.revs)
-        start_number = max(o.number, entry["number"] + 1) if resume_staged else o.number
+        start_number = o.number
+        if same_run:
+            start_number = max(start_number, prior["next_number"])
+        if resume_staged:
+            start_number = max(start_number, entry["number"] + 1)
 
         print_run_info(
             console,
@@ -520,6 +576,15 @@ def run(console, options, report=None):
 
         acting = True
         try:
+            if same_run:
+                journal.note("resumed", staged_files=len(resume_staged))
+            else:
+                journal.start(
+                    o.params,
+                    branch,
+                    target.label,
+                    run_git(repo, "rev-parse", "HEAD").stdout.strip(),
+                )
             # Repository-local settings only; the previous values are restored below.
             config = LocalConfig(repo)
             if o.compression_threads is not None:
@@ -561,7 +626,10 @@ def run(console, options, report=None):
 
                 if resume_staged:
                     run_git(repo, "commit", "-m", entry["message"])
-                    journal.clear()
+                    journal.committed(
+                        entry["number"],
+                        run_git(repo, "rev-parse", "HEAD").stdout.strip(),
+                    )
                     logger.info("Committed resumed batch: %s", entry["message"])
                     if find_large_unpushed_blobs(
                         repo, HOST_LIMIT_MIB * MIB, target.revs
@@ -575,6 +643,7 @@ def run(console, options, report=None):
                 if (resume_staged or unpushed) and not o.no_push:
                     push_target(repo, progress, push_task, console, o, target)
                     verify()
+                    journal.pushed(run_git(repo, "rev-parse", "HEAD").stdout.strip())
                     console.print("[green]Resumed commits pushed.[/green]")
 
                 if o.lfs_commit_rules and lfs_paths:
@@ -636,6 +705,8 @@ def run(console, options, report=None):
                 config.restore()
                 logger.info("Local git config restored")
 
+        journal.delete()
+
         code = print_final_summary(
             console,
             repo,
@@ -663,6 +734,8 @@ def run(console, options, report=None):
         console.print("\n[yellow]Interrupted by user.[/yellow]")
         report.status = INTERRUPTED
         report.error = "Interrupted by user"
+        if acting and journal:
+            journal.note("interrupted")
         if acting:
             console.print(
                 "[dim]Run the same command again to resume from where it stopped.[/dim]"
@@ -674,6 +747,8 @@ def run(console, options, report=None):
         console.print(f"\n[bold red]Error:[/bold red] {escape(message)}")
         report.status = ABORTED if not acting else FAILED
         report.error = message
+        if acting and journal:
+            journal.note("failed", error=message)
         if acting:
             console.print(
                 "[dim]Run the same command again to resume from where it stopped.[/dim]"

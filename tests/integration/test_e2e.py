@@ -215,3 +215,157 @@ def test_resumed_commit_keeps_the_attribution(project, tmp_path):
     assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1", "--no-push") == 0
     assert run_cli(repo, tmp_path, "--force") == 0
     assert all(ATTRIBUTION in body for body in commit_bodies(repo, 2))
+
+
+def interrupt_second_push(monkeypatch):
+    """Make Ctrl+C hit while the second batch is being pushed."""
+    from commitrocket import runner
+
+    real = runner.push_target
+    calls = []
+
+    def push(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 2:
+            raise KeyboardInterrupt
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "push_target", push)
+    return lambda: monkeypatch.setattr(runner, "push_target", real)
+
+
+def resume_cli(repo, tmp_path, *extra):
+    return main(["--repo", str(repo), "--log-file", str(tmp_path / "run.log"), *extra])
+
+
+def test_resume_continues_with_the_stored_parameters(project, tmp_path, monkeypatch):
+    from commitrocket.journal import Journal
+
+    repo, remote, branch = project
+    add_files(repo, 4)
+    restore = interrupt_second_push(monkeypatch)
+
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+    journal = Journal(repo)
+    assert journal.path.exists()
+    assert journal.state()["params"]["limit_mib"] == 1
+    assert journal.state()["status"] == "interrupted"
+    restore()
+
+    # No parameters needed: they come from the journal.
+    assert resume_cli(repo, tmp_path, "--resume", "--force") == 0
+
+    assert not journal.path.exists()
+    bodies = commit_bodies(repo, 4)
+    assert bodies[0].startswith("Data #4")
+    assert [b.split("\n")[0] for b in reversed(bodies)] == [
+        "Data #1",
+        "Data #2",
+        "Data #3",
+        "Data #4",
+    ]
+    local = run_git(repo, "rev-parse", "HEAD").stdout.strip()
+    assert run_git(remote, "rev-parse", f"refs/heads/{branch}").stdout.strip() == local
+
+
+def test_resume_accepts_identical_parameters(project, tmp_path, monkeypatch):
+    repo, _, _ = project
+    add_files(repo, 3)
+    restore = interrupt_second_push(monkeypatch)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+    restore()
+
+    code = resume_cli(
+        repo, tmp_path, "--resume", "--force", "--message", "Data", "--limit-mib", "1"
+    )
+
+    assert code == 0
+
+
+def test_resume_rejects_different_parameters(project, tmp_path, monkeypatch, capsys):
+    from commitrocket.journal import Journal
+
+    repo, _, _ = project
+    add_files(repo, 3)
+    interrupt_second_push(monkeypatch)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+
+    with pytest.raises(SystemExit) as exc:
+        resume_cli(repo, tmp_path, "--resume", "--force", "--limit-mib", "5")
+
+    assert exc.value.code == 2
+    assert "--limit-mib" in capsys.readouterr().err
+    assert Journal(repo).path.exists()
+
+
+def test_resume_without_a_journal_is_a_clear_error(project, tmp_path, capsys):
+    repo, _, _ = project
+
+    with pytest.raises(SystemExit) as exc:
+        resume_cli(repo, tmp_path, "--resume")
+
+    assert exc.value.code == 2
+    assert "no interrupted run" in capsys.readouterr().err
+
+
+def test_resume_refuses_a_repository_that_changed(project, tmp_path, monkeypatch):
+    repo, _, _ = project
+    add_files(repo, 3)
+    interrupt_second_push(monkeypatch)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+    run_git(repo, "reset", "--hard", "HEAD~1")  # drops a recorded commit
+
+    assert resume_cli(repo, tmp_path, "--resume", "--force") == 1
+
+
+def test_plain_rerun_with_other_parameters_starts_a_new_run(
+    project, tmp_path, monkeypatch
+):
+    from commitrocket.journal import Journal
+
+    repo, _, _ = project
+    add_files(repo, 3)
+    restore = interrupt_second_push(monkeypatch)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+    restore()
+
+    code = main(
+        [
+            "--repo",
+            str(repo),
+            "--message",
+            "Other",
+            "--limit-mib",
+            "1",
+            "--force",
+            "--log-file",
+            str(tmp_path / "run.log"),
+        ]
+    )
+
+    assert code == 0
+    assert not Journal(repo).path.exists()
+    assert commit_bodies(repo, 1)[0].startswith("Other #1")
+
+
+def test_plain_rerun_with_the_same_parameters_continues(project, tmp_path, monkeypatch):
+    repo, _, _ = project
+    add_files(repo, 3)
+    restore = interrupt_second_push(monkeypatch)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+    restore()
+
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 0
+
+    assert commit_bodies(repo, 1)[0].startswith("Data #3")
+
+
+def test_dry_run_leaves_no_journal(project, tmp_path):
+    from commitrocket.journal import Journal
+
+    repo, _, _ = project
+    add_files(repo, 2)
+
+    assert run_cli(repo, tmp_path, "--dry-run", "--limit-mib", "1") == 0
+
+    assert not Journal(repo).path.exists()

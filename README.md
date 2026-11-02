@@ -78,6 +78,7 @@ nothing staged, then asks for confirmation.
 | `--repo` | The Git repository to work on (default: the current folder) |
 | `--message` | Commit message used for every batch (required, here or in a config file) |
 | `--message-template` | Shape of each commit message (default `{message} #{n}`, see below) |
+| `--resume` | Continue the interrupted run in this repository with the parameters it started with (see "Interrupted or failed runs") |
 | `--no-attribution` | Don't append the CommitRocket attribution line to commit messages (alias `--ignore-attribution`, see below) |
 | `--number` | Number to start the `#` suffix from (default 1) |
 | `--config` | Read settings from this TOML file (see "Config file") |
@@ -476,14 +477,37 @@ part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ### Interrupted or failed runs
 
-If a run stops, whether it failed or you pressed Ctrl+C, just run the same command again.
-CommitRocket picks up where it stopped:
+If a run stops, whether it failed or you pressed Ctrl+C, CommitRocket keeps a journal of it
+in `.git/commitrocket-journal.jsonl`. It lives inside `.git`, so it is never committed and
+needs no `.gitignore` entry. It records every parameter of the run plus its progress
+(batches staged, committed and pushed), and is deleted when the run finishes.
+
+To carry on, run:
+
+```
+commitrocket --repo . --resume
+```
+
+- The stored parameters are reused, so you don't type them again. Run-specific options such
+  as `--force`, `--dry-run`, `--report`, `--log-file` and `--notify-webhook` are not stored
+  and work as usual.
+- You may repeat parameters, but only with the same values. A different value is an error
+  (`--resume reuses the parameters of the interrupted run, but these differ ...`). To change
+  parameters, run without `--resume` and a new run starts.
+- Running the same command again without `--resume` also continues the run, as long as the
+  parameters are identical. With different parameters it starts a new run and the old
+  journal is replaced.
+- `--resume` stops with a clear message if there is no journal, if it is damaged or from
+  another version, if you are on a different branch or target, or if the repository changed
+  (a commit the run made is no longer in the branch's history).
+
+When continuing:
 
 - Commits that were made but not pushed are pushed first (they are listed in the plan, and
   the usual confirmation applies).
 - Files left staged by the interrupted batch are recognised as its own and committed with
   their original message. Files you staged yourself still stop the run.
-- Numbering continues after the interrupted batch.
+- Numbering continues after the last commit of the interrupted run.
 
 ### Checks after each push
 

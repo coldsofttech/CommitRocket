@@ -44,11 +44,20 @@ remain, `130` interrupted.
   raises `PushError` whose `retryable` flag is false when the output matches
   `NON_RETRYABLE_MARKERS` (host rejections, auth). Otherwise it waits 5 s, 15 s, 45 s...
   The same retry count applies to the post-push `ls-remote`.
-- **Resume**: `journal.Journal` (`.git/commitrocket-journal.json`) is written before `git
-  add` and cleared after `git commit`. At startup, staged files that are a subset of the
-  journal's files are committed with its message and number; other staged files abort.
-  Unpushed commits (after the >100 MiB stuck-commit check) are pushed before new batches,
-  and numbering continues from `max(--number, journal number + 1)`.
+- **Resume**: `journal.Journal` (`.git/commitrocket-journal.jsonl`, so never tracked) is an
+  append-only event log: `run` (version, every run parameter, branch, target, starting
+  HEAD), `staged` (before `git add`), `committed`, `pushed`, `resumed` and
+  `interrupted`/`failed`. `Journal.state()` replays it and ignores a line cut short by a
+  crash. `cli.run_params` collects the parameters (everything except `NOT_RUN_PARAMS`) into
+  `RunOptions.params`. In `runner.run`, a journal whose params equal the current ones
+  continues the run (plain re-run or `--resume`); different params replace it with a new
+  run. `--resume` (`cli.apply_resume`) loads the stored params into the parsed arguments
+  and errors on explicitly passed values that differ; `runner.check_resume` verifies
+  branch, target and that the last recorded commit is still in HEAD's history. Staged files
+  that are a subset of the in-flight batch are committed with its message and number;
+  other staged files abort. Unpushed commits (after the >100 MiB stuck-commit check) are
+  pushed before new batches, and numbering continues from the last committed number. The
+  journal is deleted when a run finishes; `--dry-run` never writes it.
 - **`--post-buffer-mib`**: sets `http.postBuffer` through `LocalConfig` for HTTP(S)
   remotes only (checked with `git remote get-url`), restored afterwards.
 - **Verification**: `verify.verify_remote_head` compares `git ls-remote <remote> <ref>`
