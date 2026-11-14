@@ -1,5 +1,3 @@
-from pathlib import Path, PurePosixPath
-
 # Git hosts reject pushes containing files larger than this.
 HOST_LIMIT_MIB = 100
 
@@ -45,6 +43,7 @@ def committed_rule_lines(paths):
     Extension rules also cover future files of the same type.
     """
     import re
+    from pathlib import PurePosixPath
 
     lines = set()
     for path in paths:
@@ -153,6 +152,8 @@ class LfsSession:
 
     def enable(self, paths, all_files=False):
         """Route paths through LFS, or every file when all_files is set."""
+        from pathlib import Path
+
         from commitrocket.git.git import run_git
 
         info_path = run_git(
@@ -186,6 +187,8 @@ class LfsSession:
 
         Returns True if the file changed.
         """
+        from pathlib import Path
+
         from commitrocket.git.git import run_git
         from commitrocket.support.errors import CommitRocketError
 

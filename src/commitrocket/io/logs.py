@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
 DEFAULT_LEVEL = "INFO"
@@ -19,6 +18,7 @@ def default_log_dir():
     """The conventional per-user log folder for the current OS."""
     import os
     import sys
+    from pathlib import Path
 
     home = Path.home()
 
@@ -35,6 +35,7 @@ def default_log_dir():
 def setup_logging(level=DEFAULT_LEVEL, log_file=None):
     """Log to a file for this run. Returns its path, or None if it can't be opened."""
     from datetime import datetime
+    from pathlib import Path
 
     from commitrocket.support.security import restrict_permissions
 

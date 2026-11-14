@@ -1,35 +1,33 @@
 import logging
 
-from commitrocket.io.report import (
-    ABORTED,
-    CANCELLED,
-    DEFERRED,
-    FAILED,
-    INTERRUPTED,
-    SUCCESS,
-)
-
 logger = logging.getLogger(__name__)
 
 DESKTOP_TIMEOUT = 15
 WEBHOOK_TIMEOUT = 10
 
-HEADLINES = {
-    SUCCESS: "finished",
-    DEFERRED: "finished, some files were skipped",
-    CANCELLED: "cancelled",
-    ABORTED: "stopped before starting",
-    INTERRUPTED: "interrupted",
-    FAILED: "failed",
-}
-
 
 def build_message(report):
     """(title, body) describing how the run ended."""
     from commitrocket.core.eta import format_duration
+    from commitrocket.io.report import (
+        ABORTED,
+        CANCELLED,
+        DEFERRED,
+        FAILED,
+        INTERRUPTED,
+        SUCCESS,
+    )
     from commitrocket.support.security import redact
 
-    title = f"CommitRocket {HEADLINES.get(report.status, report.status)}"
+    headlines = {
+        SUCCESS: "finished",
+        DEFERRED: "finished, some files were skipped",
+        CANCELLED: "cancelled",
+        ABORTED: "stopped before starting",
+        INTERRUPTED: "interrupted",
+        FAILED: "failed",
+    }
+    title = f"CommitRocket {headlines.get(report.status, report.status)}"
 
     parts = []
     if report.batches:

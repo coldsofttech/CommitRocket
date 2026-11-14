@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from commitrocket.support.errors import CommitRocketError
 
 CONFIG_NAME = "commitrocket.toml"
@@ -33,6 +31,8 @@ def find_config(repo, explicit=None):
     Looked up in the repository folder: commitrocket.toml first, then the
     [tool.commitrocket] table of pyproject.toml. --config overrides the lookup.
     """
+    from pathlib import Path
+
     if explicit:
         path = Path(explicit).expanduser()
         if not path.is_file():

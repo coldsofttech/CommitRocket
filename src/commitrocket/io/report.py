@@ -1,5 +1,3 @@
-from pathlib import Path
-
 SCHEMA_VERSION = 1
 
 SUCCESS = "success"
@@ -115,6 +113,7 @@ class RunReport:
         import json
         import os
         import tempfile
+        from pathlib import Path
 
         from commitrocket.support.security import restrict_permissions
 

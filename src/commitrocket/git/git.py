@@ -1,6 +1,5 @@
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +234,8 @@ def find_large_unpushed_blobs(repo, threshold_bytes, revs):
 
 
 def get_file_size(repo, relative_path):
+    from pathlib import Path
+
     try:
         path = Path(repo) / relative_path
         return path.stat().st_size if path.is_file() else 0

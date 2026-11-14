@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +49,7 @@ def collect_checks(repo, remote=None, branch=None, offline=False, config_path=No
     """Run every check and return [(status, name, detail), ...]."""
     import subprocess
     import sys
+    from pathlib import Path
 
     from commitrocket.core.batching import MIB
     from commitrocket.core.filters import IGNORE_FILE

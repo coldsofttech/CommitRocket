@@ -1,11 +1,4 @@
-import json
-import os
-from datetime import UTC, datetime
-from pathlib import Path
-
 from commitrocket.support.errors import CommitRocketError
-from commitrocket.git.git import run_git
-from commitrocket.support.security import restrict_permissions
 
 JOURNAL_NAME = "commitrocket-journal.jsonl"
 LEGACY_NAME = "commitrocket-journal.json"
@@ -33,6 +26,10 @@ class Journal:
 
     @staticmethod
     def _git_path(repo, name):
+        from pathlib import Path
+
+        from commitrocket.git.git import run_git
+
         relative = run_git(repo, "rev-parse", "--git-path", name).stdout.strip()
         return Path(repo) / relative
 
@@ -54,6 +51,12 @@ class Journal:
         )
 
     def append(self, event):
+        import json
+        import os
+        from datetime import UTC, datetime
+
+        from commitrocket.support.security import restrict_permissions
+
         event = {**event, "at": datetime.now(UTC).isoformat(timespec="seconds")}
         created = not self.path.exists()
         with open(self.path, "a", encoding="utf-8") as handle:
@@ -94,6 +97,8 @@ class Journal:
     # -- reading -----------------------------------------------------------
 
     def events(self):
+        import json
+
         try:
             text = self.path.read_text(encoding="utf-8")
         except OSError:
