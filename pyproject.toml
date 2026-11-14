@@ -51,7 +51,7 @@ packages = ["src/commitrocket"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "--strict-markers"
+addopts = "--strict-markers --import-mode=importlib"
 markers = [
     "integration: end-to-end runs against a local bare repository (slower; excluded from pre-commit, run in CI)",
 ]
