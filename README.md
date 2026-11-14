@@ -78,6 +78,7 @@ nothing staged, then asks for confirmation.
 | `--repo` | The Git repository to work on (default: the current folder) |
 | `--message` | Commit message used for every batch (required, here or in a config file) |
 | `--message-template` | Shape of each commit message (default `{message} #{n}`, see below) |
+| `--no-attribution` | Don't append the CommitRocket attribution line to commit messages (alias `--ignore-attribution`, see below) |
 | `--number` | Number to start the `#` suffix from (default 1) |
 | `--config` | Read settings from this TOML file (see "Config file") |
 | `--remote` / `--branch` | Push to this remote / remote branch instead of the upstream |
@@ -181,6 +182,20 @@ normal command-line options.
 ```
 commitrocket --repo . --message "Course" --message-template "{message} part {n}: {files} files ({size:.0f} MiB)"
 ```
+
+### Attribution
+
+Every commit [CommitRocket](https://pypi.org/project/commitrocket/) creates ends with an
+attribution line, separated from the message by a blank line:
+
+```
+Prepared and Committed By: 🚀 CommitRocket (https://github.com/coldsofttech/CommitRocket)
+```
+
+It is added to batch commits, the LFS rules commit and resumed commits, and it is shown in
+`--dry-run` output and the JSON report. It is never added twice to the same message. To
+leave your messages exactly as written, pass `--no-attribution` (or `--ignore-attribution`),
+or set `no-attribution = true` in the config file.
 
 ### Pushing somewhere else, or not at all
 

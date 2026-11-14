@@ -7,6 +7,7 @@ import pytest
 
 from commitrocket.cli import main
 from commitrocket.git import run_git
+from commitrocket.template import ATTRIBUTION
 
 pytestmark = pytest.mark.integration
 
@@ -59,9 +60,9 @@ def test_full_run_pushes_every_batch_and_writes_a_report(project, tmp_path):
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["status"] == "success"
     assert [b["message"] for b in report["batches"]] == [
-        "Data #1",
-        "Data #2",
-        "Data #3",
+        f"Data #1\n\n{ATTRIBUTION}",
+        f"Data #2\n\n{ATTRIBUTION}",
+        f"Data #3\n\n{ATTRIBUTION}",
     ]
     assert all(b["pushed"] and b["verified"] for b in report["batches"])
 
@@ -164,3 +165,53 @@ def get_staged(repo):
 def untracked(repo):
     out = run_git(repo, "ls-files", "--others", "--exclude-standard").stdout
     return out.split()
+
+
+def commit_bodies(repo, count):
+    out = run_git(repo, "log", f"-{count}", "--format=%B%x00").stdout
+    return [body.strip() for body in out.split("\0") if body.strip()]
+
+
+def test_commits_end_with_the_attribution(project, tmp_path):
+    repo, _, _ = project
+    add_files(repo, 2)
+
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 0
+
+    bodies = commit_bodies(repo, 2)
+    assert all(body.endswith(f"\n\n{ATTRIBUTION}") for body in bodies)
+    assert all(body.count(ATTRIBUTION) == 1 for body in bodies)
+
+
+def test_no_attribution_flag_leaves_messages_untouched(project, tmp_path):
+    repo, _, _ = project
+    add_files(repo, 2)
+
+    code = run_cli(repo, tmp_path, "--force", "--limit-mib", "1", "--no-attribution")
+
+    assert code == 0
+    assert commit_bodies(repo, 2) == ["Data #2", "Data #1"]
+
+
+def test_ignore_attribution_alias_and_dry_run_report(project, tmp_path):
+    repo, _, _ = project
+    add_files(repo, 1)
+    plain = tmp_path / "plain.json"
+    full = tmp_path / "full.json"
+
+    run_cli(repo, tmp_path, "--dry-run", "--ignore-attribution", "--report", str(plain))
+    run_cli(repo, tmp_path, "--dry-run", "--report", str(full))
+
+    plain_msg = json.loads(plain.read_text(encoding="utf-8"))["batches"][0]["message"]
+    full_msg = json.loads(full.read_text(encoding="utf-8"))["batches"][0]["message"]
+    assert plain_msg == "Data #1"
+    assert full_msg == f"Data #1\n\n{ATTRIBUTION}"
+
+
+def test_resumed_commit_keeps_the_attribution(project, tmp_path):
+    """Commits made by an earlier run keep their attribution when pushed later."""
+    repo, _, _ = project
+    add_files(repo, 2)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1", "--no-push") == 0
+    assert run_cli(repo, tmp_path, "--force") == 0
+    assert all(ATTRIBUTION in body for body in commit_bodies(repo, 2))

@@ -58,6 +58,14 @@ def build_parser():
         f"Placeholders: {', '.join(PLACEHOLDERS)}",
     )
     parser.add_argument(
+        "--no-attribution",
+        "--ignore-attribution",
+        dest="no_attribution",
+        action="store_true",
+        help="Don't append the 'Prepared and Committed By: CommitRocket' line "
+        "to commit messages",
+    )
+    parser.add_argument(
         "--number",
         type=int,
         default=1,
@@ -317,6 +325,7 @@ def run_main(argv):
         repo=args.repo,
         message=args.message,
         message_template=args.message_template,
+        attribution=not args.no_attribution,
         number=args.number,
         force=args.force,
         remote=args.remote,
