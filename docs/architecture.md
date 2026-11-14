@@ -17,12 +17,13 @@ src/commitrocket/
     parser.py       argparse definition of every option
     validate.py     option checks and the effective --max-mib
     execute.py      run_main(): config, logging, run, report, notifications
+    resume.py       run parameters and applying --resume
     doctor.py       doctor_main(): argparse and output for `commitrocket doctor`
   core/             the batching logic
     runner/         the run itself
       flow.py       run(): preflight, confirmation and the commit/push sequence
       batches.py    process_batches: the batch -> commit -> push loop
-      resume.py     resume state, resumed commits, committed LFS rules
+      resume.py     resume checks and state, resumed commits, committed LFS rules
       setup.py      LFS planning, local git config, LFS session set-up and release
       dry_run.py    --dry-run planning
       helpers.py    own_output_files, push_target
@@ -36,7 +37,7 @@ src/commitrocket/
     git.py          run_git, pending/staged helpers, PushTarget, LocalConfig
     lfs.py          LFS candidates, git-lfs install, LfsSession
     push.py         streams `git push --progress`, retries
-    journal.py      the resume journal
+    journal.py      the resume journal (.git/commitrocket-journal.jsonl)
   io/               what the user sees and what a run writes
     ui.py           Rich progress, panels and tables
     logs.py         per-run log file and redaction
@@ -70,8 +71,8 @@ notification scripts in `io/scripts/`.
 ## Tests
 
 `tests/unit/` mirrors this tree (`cli/`, `core/`, `core/runner/`, `git/`, `io/`,
-`support/`); `tests/integration/` runs the real CLI against a local bare repository.
-See [development.md](development.md) for the markers and how to run them.
+`support/`), with one `test_<module>.py` per module that holds logic;
+`tests/integration/` runs the real CLI against a local bare repository. See [development.md](development.md) for the markers and how to run them.
 
 Exit codes: `0` success, `1` error or cancelled, `2` bad repo path or deferred files
 remain, `130` interrupted.
@@ -101,15 +102,15 @@ remain, `130` interrupted.
   raises `PushError` whose `retryable` flag is false when the output matches
   `NON_RETRYABLE_MARKERS` (host rejections, auth). Otherwise it waits 5 s, 15 s, 45 s...
   The same retry count applies to the post-push `ls-remote`.
-- **Resume**: `journal.Journal` (`.git/commitrocket-journal.jsonl`, so never tracked) is an
+- **Resume**: `git/journal.py::Journal` (`.git/commitrocket-journal.jsonl`, so never tracked) is an
   append-only event log: `run` (version, every run parameter, branch, target, starting
   HEAD), `staged` (before `git add`), `committed`, `pushed`, `resumed` and
   `interrupted`/`failed`. `Journal.state()` replays it and ignores a line cut short by a
-  crash. `cli.run_params` collects the parameters (everything except `NOT_RUN_PARAMS`) into
-  `RunOptions.params`. In `runner.run`, a journal whose params equal the current ones
+  crash. `cli/resume.py::run_params` collects the parameters (everything except `NOT_RUN_PARAMS`) into
+  `RunOptions.params`. In `core/runner/flow.py::run`, a journal whose params equal the current ones
   continues the run (plain re-run or `--resume`); different params replace it with a new
-  run. `--resume` (`cli.apply_resume`) loads the stored params into the parsed arguments
-  and errors on explicitly passed values that differ; `runner.check_resume` verifies
+  run. `--resume` (`cli/resume.py::apply_resume`) loads the stored params into the parsed arguments
+  and errors on explicitly passed values that differ; `core/runner/resume.py::check_resume` verifies
   branch, target and that the last recorded commit is still in HEAD's history. Staged files
   that are a subset of the in-flight batch are committed with its message and number;
   other staged files abort. Unpushed commits (after the >100 MiB stuck-commit check) are

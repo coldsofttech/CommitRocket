@@ -49,7 +49,9 @@ Tests are marked, so you can pick what to run:
 
 Unit tests live in `tests/unit/` and mirror `src/commitrocket/`: a test for
 `core/batching.py` goes in `tests/unit/core/test_batching.py`. Shared fixtures are in
-`tests/conftest.py`.
+`tests/conftest.py`. The test folders have no `__init__.py` and pytest runs with
+`--import-mode=importlib`, so two modules in different folders can both have a
+`test_doctor.py` or `test_resume.py`.
 
 Pre-commit and the `tests.yml` workflow run pytest in parallel with `pytest-xdist`
 (`-n auto`, one worker per CPU core). Add `-n auto` locally for speed, or leave it off

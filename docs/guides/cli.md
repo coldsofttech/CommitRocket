@@ -100,6 +100,7 @@ characters.
 |---|---|
 | `--dry-run` | Show the batches and commit messages that would be made, without staging, committing or pushing anything |
 | `--force` | Skip the confirmation prompt, and install git-lfs without asking |
+| `--resume` | Continue the interrupted run in this repository with the settings it started with (see [Interrupted runs](#interrupted-runs)) |
 
 ### Output
 
@@ -316,9 +317,32 @@ deleted automatically.
 
 ## Interrupted runs
 
-If a run stops, whether from an error, a failed push or Ctrl+C, run the same command again.
-CommitRocket recognises the files it left staged, commits them with their original message,
-pushes any commits that are still waiting, and carries on numbering from there.
+If a run stops, whether from an error, a failed push or Ctrl+C, CommitRocket remembers it in
+a small file inside `.git` (`commitrocket-journal.jsonl`), so it is never committed. It is
+deleted when a run finishes.
+
+To carry on, either run the same command again or use `--resume`:
+
+```
+commitrocket --repo . --resume
+```
+
+- `--resume` reuses the settings the interrupted run started with, so you don't type them
+  again. Options that only affect how a run is shown or written (`--force`, `--dry-run`,
+  `--report`, `--log-file`, `--level`, `--notify`, `--notify-webhook`) are not remembered and
+  work as usual.
+- You may repeat a setting with `--resume`, but only with the same value. A different value
+  is an error. To change settings, run without `--resume`: a new run starts.
+- Running the same command again without `--resume` also continues the run when the
+  settings are identical. With different settings it starts a new run and replaces the old
+  record.
+- `--resume` stops with a clear message if there is no interrupted run, if the record is
+  damaged or from another version, if you are on a different branch or push target, or if
+  the repository changed (a commit the run made is no longer in the branch's history).
+
+When continuing, CommitRocket recognises the files it left staged, commits them with their
+original message, pushes any commits that are still waiting, and carries on numbering from
+there. Files you staged yourself still stop the run.
 
 ## Examples
 
