@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-14
+
 ### Added
 - Commits now end with a `Prepared and Committed By: 🚀 CommitRocket (...)` attribution line, never added twice.
 - `--no-attribution` (alias `--ignore-attribution`, or `no-attribution = true` in the config file) skips it.
