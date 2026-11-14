@@ -6,8 +6,8 @@ import subprocess
 import pytest
 
 from commitrocket.cli import main
-from commitrocket.git import run_git
-from commitrocket.template import ATTRIBUTION
+from commitrocket.core.template import ATTRIBUTION
+from commitrocket.git.git import run_git
 
 pytestmark = pytest.mark.integration
 
