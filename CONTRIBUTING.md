@@ -9,6 +9,7 @@ By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 - Use the issue templates. For a bug, include the exact command, the output, your
   versions (`commitrocket --version`, `commitrocket doctor`), and the relevant lines from
   the log file (re-run with `--level DEBUG`). Remove secrets and private paths.
+- **Questions:** see [SUPPORT.md](SUPPORT.md) for where to ask.
 - **Security problems:** do not open an issue. Follow the [Security Policy](SECURITY.md).
 
 ## Setting up
