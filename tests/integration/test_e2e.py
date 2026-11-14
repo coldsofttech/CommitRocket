@@ -6,7 +6,8 @@ import subprocess
 import pytest
 
 from commitrocket.cli import main
-from commitrocket.git import run_git
+from commitrocket.core.template import ATTRIBUTION
+from commitrocket.git.git import run_git
 
 pytestmark = pytest.mark.integration
 
@@ -59,9 +60,9 @@ def test_full_run_pushes_every_batch_and_writes_a_report(project, tmp_path):
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["status"] == "success"
     assert [b["message"] for b in report["batches"]] == [
-        "Data #1",
-        "Data #2",
-        "Data #3",
+        f"Data #1\n\n{ATTRIBUTION}",
+        f"Data #2\n\n{ATTRIBUTION}",
+        f"Data #3\n\n{ATTRIBUTION}",
     ]
     assert all(b["pushed"] and b["verified"] for b in report["batches"])
 
@@ -164,3 +165,207 @@ def get_staged(repo):
 def untracked(repo):
     out = run_git(repo, "ls-files", "--others", "--exclude-standard").stdout
     return out.split()
+
+
+def commit_bodies(repo, count):
+    out = run_git(repo, "log", f"-{count}", "--format=%B%x00").stdout
+    return [body.strip() for body in out.split("\0") if body.strip()]
+
+
+def test_commits_end_with_the_attribution(project, tmp_path):
+    repo, _, _ = project
+    add_files(repo, 2)
+
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 0
+
+    bodies = commit_bodies(repo, 2)
+    assert all(body.endswith(f"\n\n{ATTRIBUTION}") for body in bodies)
+    assert all(body.count(ATTRIBUTION) == 1 for body in bodies)
+
+
+def test_no_attribution_flag_leaves_messages_untouched(project, tmp_path):
+    repo, _, _ = project
+    add_files(repo, 2)
+
+    code = run_cli(repo, tmp_path, "--force", "--limit-mib", "1", "--no-attribution")
+
+    assert code == 0
+    assert commit_bodies(repo, 2) == ["Data #2", "Data #1"]
+
+
+def test_ignore_attribution_alias_and_dry_run_report(project, tmp_path):
+    repo, _, _ = project
+    add_files(repo, 1)
+    plain = tmp_path / "plain.json"
+    full = tmp_path / "full.json"
+
+    run_cli(repo, tmp_path, "--dry-run", "--ignore-attribution", "--report", str(plain))
+    run_cli(repo, tmp_path, "--dry-run", "--report", str(full))
+
+    plain_msg = json.loads(plain.read_text(encoding="utf-8"))["batches"][0]["message"]
+    full_msg = json.loads(full.read_text(encoding="utf-8"))["batches"][0]["message"]
+    assert plain_msg == "Data #1"
+    assert full_msg == f"Data #1\n\n{ATTRIBUTION}"
+
+
+def test_resumed_commit_keeps_the_attribution(project, tmp_path):
+    """Commits made by an earlier run keep their attribution when pushed later."""
+    repo, _, _ = project
+    add_files(repo, 2)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1", "--no-push") == 0
+    assert run_cli(repo, tmp_path, "--force") == 0
+    assert all(ATTRIBUTION in body for body in commit_bodies(repo, 2))
+
+
+def interrupt_second_push(monkeypatch):
+    """Make Ctrl+C hit while the second batch is being pushed."""
+    from commitrocket.core.runner import helpers as runner
+
+    real = runner.push_target
+    calls = []
+
+    def push(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 2:
+            raise KeyboardInterrupt
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "push_target", push)
+    return lambda: monkeypatch.setattr(runner, "push_target", real)
+
+
+def resume_cli(repo, tmp_path, *extra):
+    return main(["--repo", str(repo), "--log-file", str(tmp_path / "run.log"), *extra])
+
+
+def test_resume_continues_with_the_stored_parameters(project, tmp_path, monkeypatch):
+    from commitrocket.git.journal import Journal
+
+    repo, remote, branch = project
+    add_files(repo, 4)
+    restore = interrupt_second_push(monkeypatch)
+
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+    journal = Journal(repo)
+    assert journal.path.exists()
+    assert journal.state()["params"]["limit_mib"] == 1
+    assert journal.state()["status"] == "interrupted"
+    restore()
+
+    # No parameters needed: they come from the journal.
+    assert resume_cli(repo, tmp_path, "--resume", "--force") == 0
+
+    assert not journal.path.exists()
+    bodies = commit_bodies(repo, 4)
+    assert bodies[0].startswith("Data #4")
+    assert [b.split("\n")[0] for b in reversed(bodies)] == [
+        "Data #1",
+        "Data #2",
+        "Data #3",
+        "Data #4",
+    ]
+    local = run_git(repo, "rev-parse", "HEAD").stdout.strip()
+    assert run_git(remote, "rev-parse", f"refs/heads/{branch}").stdout.strip() == local
+
+
+def test_resume_accepts_identical_parameters(project, tmp_path, monkeypatch):
+    repo, _, _ = project
+    add_files(repo, 3)
+    restore = interrupt_second_push(monkeypatch)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+    restore()
+
+    code = resume_cli(
+        repo, tmp_path, "--resume", "--force", "--message", "Data", "--limit-mib", "1"
+    )
+
+    assert code == 0
+
+
+def test_resume_rejects_different_parameters(project, tmp_path, monkeypatch, capsys):
+    from commitrocket.git.journal import Journal
+
+    repo, _, _ = project
+    add_files(repo, 3)
+    interrupt_second_push(monkeypatch)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+
+    with pytest.raises(SystemExit) as exc:
+        resume_cli(repo, tmp_path, "--resume", "--force", "--limit-mib", "5")
+
+    assert exc.value.code == 2
+    assert "--limit-mib" in capsys.readouterr().err
+    assert Journal(repo).path.exists()
+
+
+def test_resume_without_a_journal_is_a_clear_error(project, tmp_path, capsys):
+    repo, _, _ = project
+
+    with pytest.raises(SystemExit) as exc:
+        resume_cli(repo, tmp_path, "--resume")
+
+    assert exc.value.code == 2
+    assert "no interrupted run" in capsys.readouterr().err
+
+
+def test_resume_refuses_a_repository_that_changed(project, tmp_path, monkeypatch):
+    repo, _, _ = project
+    add_files(repo, 3)
+    interrupt_second_push(monkeypatch)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+    run_git(repo, "reset", "--hard", "HEAD~1")  # drops a recorded commit
+
+    assert resume_cli(repo, tmp_path, "--resume", "--force") == 1
+
+
+def test_plain_rerun_with_other_parameters_starts_a_new_run(
+    project, tmp_path, monkeypatch
+):
+    from commitrocket.git.journal import Journal
+
+    repo, _, _ = project
+    add_files(repo, 3)
+    restore = interrupt_second_push(monkeypatch)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+    restore()
+
+    code = main(
+        [
+            "--repo",
+            str(repo),
+            "--message",
+            "Other",
+            "--limit-mib",
+            "1",
+            "--force",
+            "--log-file",
+            str(tmp_path / "run.log"),
+        ]
+    )
+
+    assert code == 0
+    assert not Journal(repo).path.exists()
+    assert commit_bodies(repo, 1)[0].startswith("Other #1")
+
+
+def test_plain_rerun_with_the_same_parameters_continues(project, tmp_path, monkeypatch):
+    repo, _, _ = project
+    add_files(repo, 3)
+    restore = interrupt_second_push(monkeypatch)
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 130
+    restore()
+
+    assert run_cli(repo, tmp_path, "--force", "--limit-mib", "1") == 0
+
+    assert commit_bodies(repo, 1)[0].startswith("Data #3")
+
+
+def test_dry_run_leaves_no_journal(project, tmp_path):
+    from commitrocket.git.journal import Journal
+
+    repo, _, _ = project
+    add_files(repo, 2)
+
+    assert run_cli(repo, tmp_path, "--dry-run", "--limit-mib", "1") == 0
+
+    assert not Journal(repo).path.exists()
